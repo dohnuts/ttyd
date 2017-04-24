@@ -107,7 +107,9 @@ callback_http(struct lws *wsi, enum lws_callback_reasons reason, void *user, voi
             if (server->index != NULL) {
                 int n = lws_serve_http_file(wsi, server->index, content_type, NULL, 0);
                 if (n < 0 || (n > 0 && lws_http_transaction_completed(wsi)))
-                    return 1;
+                    return -1;
+                 else
+                    return 0;
             } else {
                 if (lws_add_http_header_status(wsi, HTTP_STATUS_OK, &p, end))
                     return 1;
