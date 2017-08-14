@@ -1,6 +1,7 @@
 #include "server.h"
 
 volatile bool force_exit = false;
+int daemonize = 0;
 struct lws_context *context;
 struct tty_server *server;
 
@@ -23,6 +24,7 @@ static const struct option options[] = {
         {"port",         required_argument, NULL, 'p'},
         {"interface",    required_argument, NULL, 'i'},
         {"credential",   required_argument, NULL, 'c'},
+        {"daemonize",    no_argument,       NULL, 'd'},
         {"uid",          required_argument, NULL, 'u'},
         {"gid",          required_argument, NULL, 'g'},
         {"signal",       required_argument, NULL, 's'},
@@ -43,7 +45,7 @@ static const struct option options[] = {
         {"help",         no_argument,       NULL, 'h'},
         {NULL,           0,                 0,     0}
 };
-static const char *opt_string = "+A:Bc:C:g:hi:I:K:l:m:Oop:r:Rs:St:u:v";
+static const char *opt_string = "+A:Bc:dC:g:hi:I:K:l:m:Oop:r:Rs:St:u:v";
 
 void print_help() {
     fprintf(stderr, "ttyd is a tool for sharing terminal over the web\n\n"
@@ -55,6 +57,7 @@ void print_help() {
                     "    --port, -p              Port to listen (default: 7681, use `0` for random port)\n"
                     "    --interface, -i         Network interface to bind (eg: eth0), or UNIX domain socket path (eg: /var/run/ttyd.sock)\n"
                     "    --credential, -c        Credential for Basic Authentication (format: username:password)\n"
+                    "    --daemonize, -d         Fork and close std(out/in)\n"
                     "    --uid, -u               User id to run with\n"
                     "    --gid, -g               Group id to run with\n"
                     "    --signal, -s            Signal to send to the command when exit it (default: SIGHUP)\n"
@@ -218,6 +221,9 @@ main(int argc, char **argv) {
                 }
                 server->credential = base64_encode((const unsigned char *) optarg, strlen(optarg));
                 break;
+            case 'd':
+                daemonize = 1;
+                break;
             case 'u':
                 info.uid = atoi(optarg);
                 break;
@@ -344,14 +350,7 @@ main(int argc, char **argv) {
     lwsl_notice("tty configuration:\n");
     if (server->credential != NULL)
         lwsl_notice("  credential: %s\n", server->credential);
-    
-    lwsl_notice("  start command: \n");
-    for (c = 0; c < argc; c++) {
-        lwsl_notice(" %s\n", argv[c]);
-    }
-    lwsl_notice("\n");
-
-
+   
     lwsl_notice("  reconnect timeout: %ds\n", server->reconnect);
     lwsl_notice("  close signal: %s (%d)\n", server->sig_name, server->sig_code);
     if (server->check_origin)
@@ -367,7 +366,8 @@ main(int argc, char **argv) {
     }
 
     signal(SIGINT, sig_handler);  // ^C
-    signal(SIGTERM, sig_handler); // kill
+    if ( daemonize == 0 )
+        signal(SIGTERM, sig_handler); // kill
 
     context = lws_create_context(&info);
     if (context == NULL) {
@@ -380,6 +380,9 @@ main(int argc, char **argv) {
         snprintf(url, 30, "%s://localhost:%d", ssl ? "https" : "http", info.port);
         open_uri(url);
     }
+
+    if ( daemonize )
+        daemon(0, 0);
 
     // libwebsockets main loop
     while (!force_exit) {
