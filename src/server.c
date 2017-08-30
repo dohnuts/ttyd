@@ -301,7 +301,7 @@ main(int argc, char **argv) {
         return -1;
     }
 
-    lws_set_log_level(debug_level, NULL);
+    lws_set_log_level(debug_level, lwsl_emit_syslog);
 
 #if LWS_LIBRARY_VERSION_MAJOR >= 2
     char server_hdr[128] = "";
