@@ -51,8 +51,17 @@ int
 callback_http(struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len) {
     unsigned char buffer[4096 + LWS_PRE], *p, *end;
     char buf[256], name[100], rip[50];
+    lws_sockfd_type fd = lws_get_socket_fd(wsi);
 
     switch (reason) {
+        case LWS_CALLBACK_ADD_POLL_FD:
+           // no better way to actully do something on server FD
+           if ( -1 == fcntl(fd, F_SETFD, FD_CLOEXEC))
+           {
+               lwsl_warn("Cannot FD_CLOEXEC the socket.%d, %s\n", fd, strerror(errno));
+               return 1;
+           }
+           break;
         case LWS_CALLBACK_HTTP:
             // only GET method is allowed
             if (!lws_hdr_total_length(wsi, WSI_TOKEN_GET_URI) || len < 1) {
